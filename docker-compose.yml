@@ -1,0 +1,78 @@
+services:
+  mysql-server:
+    build: 
+      context: ./mysql/server
+      dockerfile: Dockerfile
+    # image: 280720/mysql-server-node:1.0
+    container_name: mysql-server-container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: demo
+    ports:
+      - "3306:3306"
+      - "3307:3307"
+    volumes:
+      - ./mysql/server/init_server.sql:/init_db/init_server.sql
+      - ./mysql/server/init_db.sh:/init_db/init_db.sh
+      - ./ssh:/root/.ssh
+    networks:
+      mysql_network:
+        ipv4_address: 192.168.122.11
+      ansible_network:
+        ipv4_address: 172.169.123.11
+    command: ["sh","-c","chmod +x /init_db/init_server.sql && chmod +x /init_db/init_db.sh && chmod +x /root/.ssh/authorized_keys && mysqld && sh ./init_db/init_db.sh"]
+
+
+  mysql-client:
+    build: 
+      context: ./mysql/client
+      dockerfile: Dockerfile
+    # image: 280720/mysql-client-node:1.0
+    container_name: mysql-client-container
+    networks:
+      mysql_network:
+        ipv4_address: 192.168.122.10
+    depends_on:
+      - mysql-server
+  
+  httpd:
+    build: 
+      context: ./httpd
+      dockerfile: Dockerfile
+    # image: 280720/httpd-node:1.0
+    container_name: httpd-container
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./ssh:/root/.ssh
+    command: ["sh","-c","chmod +x /root/.ssh/authorized_keys"]
+    networks:
+      ansible_network:
+        ipv4_address: 172.169.123.12
+    
+  ansible:
+    build: 
+      context: ./Ansible
+      dockerfile: Dockerfile
+    # image: 280720/ansible-node:1.0
+    container_name: ansible-container
+    volumes:
+      - ./ssh:/root/.ssh
+    command: ["sh","-c","chmod +x /root/.ssh/id_rsa.pub && chmod +x /root/.ssh/id_rsa"]
+    networks:
+      ansible_network:
+        ipv4_address: 172.169.123.13
+
+networks:
+  mysql_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.122.0/24
+  ansible_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.169.123.0/24
